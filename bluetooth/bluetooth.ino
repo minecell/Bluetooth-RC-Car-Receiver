@@ -2,47 +2,67 @@
 #include <SoftwareSerial.h>
 SoftwareSerial BTSerial(0, 1); // RX | TX
 
-char incomming;
-String mode;
-String value;
-bool startOfRead = true;
+const int pMotorSpeed = 5;  // Motor Controller speed
+const int pMotorDir1 = 6; // Motor Controller direction 1
+const int pMotorDir2 = 7; // Motor Controller direction 2
+const int pServo = 9; // Servo rotation
+const int pLedWhite = 12; // White Led
+const int pLedRed = 13; // Red Led
 
-Servo servo;
-int pos = 0;
+Servo servo; // servo
+char incomming; // incomming char from HC-05(Bluetooth)
+String mode; // mode of bluetooth message
+String value; // value of bluetooth value
+bool startOfRead = true;
+int ledState = 1;
+
 void setup()
 {
-  servo.attach(9);
-  // pinMode(9, OUTPUT);  // this pin will pull the HC-05 pin 34 (key pin) HIGH to switch module to AT mode
-  pinMode(5, OUTPUT);
-  pinMode(6, OUTPUT);
-  pinMode(7, OUTPUT);
-  digitalWrite(6, LOW);
-  digitalWrite(7, HIGH);
-  
+  // Pins als Output definieren und Leds einschalten
+  pinMode(pMotorSpeed, OUTPUT);
+
+  pinMode(pMotorDir1, OUTPUT);
+  digitalWrite(pMotorDir1, LOW);
+  pinMode(pMotorDir2, OUTPUT);
+  digitalWrite(pMotorDir2, HIGH);
+
+  servo.attach(pServo);
+
+  pinMode(pLedWhite, OUTPUT);
+  digitalWrite(pLedWhite, HIGH);
+  pinMode(pLedRed, OUTPUT);
+  digitalWrite(pLedRed, HIGH);
+
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+
+  // Baud Rate festlegen
   Serial.begin(4800);
-  Serial.println("Go");
+  // Serial.println("Go");
   BTSerial.begin(9600);
-  TIMSK0=0;
+  // Timer Einstellungen ändern
+  TIMSK0 = 0;
 }
 
 void loop()
 {
-  // Keep reading from HC-05 and send to Arduino Serial Monitor
+  // Daten von HC-05 lesen
   if (BTSerial.available()) {
     incomming = (char) BTSerial.read();
-    // Mode
+    // Erstes Zeichen des Strings definiert für was der Rest verwendet wird (Mode)
     if (startOfRead) {
       mode = incomming;
       // Serial.println("Mode: " + mode);
       startOfRead = false;
       return;
     }
-    // End
+    // '#' ist das letzte Zeichen des Strings
     if (incomming == '#') {
-      Serial.println(mode + value);
+      // Serial.println(mode + value);
+      // Servo steuern
       if (mode == "s") {
         if (!servo.attached()) {
-          servo.attach(9);
+          servo.attach(pServo);
         }
         servo.attach(9);
         switch (value.toInt()) {
@@ -53,17 +73,33 @@ void loop()
         }
         // servo.detach();
       }
+      // Geschwindigkeit regeln
       if (mode == "m") {
         servo.detach();
-        analogWrite(5, value.toInt());        
+        analogWrite(pMotorSpeed, value.toInt());
       }
-      // Do somthing with full value and mode
+      // Leds ein- oder ausschalten
+      if (mode == "l") { // letter L in lowercase
+        servo.detach();
+        if (ledState == 1) {
+          digitalWrite(pLedWhite, LOW);
+          digitalWrite(pLedRed, LOW);
+          digitalWrite(LED_BUILTIN, LOW);
+          ledState = 0;
+        } else {
+          digitalWrite(pLedWhite, HIGH);
+          digitalWrite(pLedRed, HIGH);
+          digitalWrite(LED_BUILTIN, HIGH);
+          ledState = 1;
+        }
+      }
+      // Reset
       mode = "";
       value = "";
       startOfRead = true;
       return;
     }
-    // Value
+    // alles zwischen dem ersten Zeichen(Mode) und dem letzen Zeichen ('#') wird an value angehänkt 
     value += incomming;
     // String(incomming)
     // Serial.println("Current value: " + value + ", Incomming: " + incomming);
